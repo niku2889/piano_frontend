@@ -41,6 +41,10 @@ export class Dashboard1Component {
     filterSource: LocalDataSource;
     alertSource: LocalDataSource;
 
+    lastL: number = 0;
+    cars: any[];
+    cols: any[];
+
     constructor(private http: Http, private messageService: MessageService, private confirmationService: ConfirmationService) {
         this.source = new LocalDataSource(tableData.data); // create the source
         this.filterSource = new LocalDataSource(tableData.filerdata); // create the source
@@ -82,6 +86,7 @@ export class Dashboard1Component {
 
     getOrdersById() {
         return this.http.get('http://localhost:3000/api/piano/orders/' + this.country.CODICE_RISORSA)
+       //return this.http.get('http://localhost:3000/api/piano/orders/S003')
             .toPromise()
             .then(res => <any[]>res.json())
     }
@@ -89,11 +94,22 @@ export class Dashboard1Component {
     selectedmachin() {
         this.getOrdersById().then(countries => {
             this.cars = countries;
+            let maxval = this.cars.filter(a => a.priorita_ordine != 999);
+            for (let i = 0; i < this.cars.length; i++) {
+                if (i > (maxval.length - 1)) {
+                    this.cars[i]['edit'] = false;
+                } else {
+                    this.cars[i]['edit'] = true;
+                }
+                if (i == (maxval.length - 1)) {
+                    this.cars[i]['lastLine'] = 'true';
+                } else {
+                    this.cars[i]['lastLine'] = 'false';
+                }
+            }
         });
     }
 
-    cars: any[];
-    cols: any[];
 
     ngOnInit() {
 
@@ -106,7 +122,7 @@ export class Dashboard1Component {
         ];
     }
 
-    updateOrder(CODICE_ORDINE, PRIORITA_ORDINE) {
+    updateOrder() {
         swal({
             title: 'Are you sure to update it?',
             type: 'warning',
@@ -127,7 +143,7 @@ export class Dashboard1Component {
                     'error'
                 )
             } else {
-                this.updateOrdercall(CODICE_ORDINE, PRIORITA_ORDINE);
+                this.updateOrdercall();
             }
         }, function (dismiss) {
             // dismiss can be 'overlay', 'cancel', 'close', 'esc', 'timer'
@@ -141,20 +157,24 @@ export class Dashboard1Component {
         })
     }
 
-    updateOrdercall(CODICE_ORDINE, PRIORITA_ORDINE) {
-        this.updateOrderService(CODICE_ORDINE, PRIORITA_ORDINE)
-            .subscribe(data => {
-                if (data) {
-                    //this.messageService.add({ severity: 'success', summary: 'Service Message', detail: 'Order updated successfully' });
-                    swal(
-                        'Updated!',
-                        'Your records has been updated.',
-                        'success'
-                    )
-                }
-                else
-                    this.messageService.add({ severity: 'error', summary: 'Error  Message', detail: 'Order update failed' });
-            });
+    updateOrdercall() {
+        for (let i = 0; i < this.cars.length; i++) {
+            this.updateOrderService(this.cars[i]['codice_ordine'], this.cars[i]['priorita_ordine'])
+                .subscribe(data => {
+                    if (i == (this.cars.length - 1)) {
+                        if (data) {
+
+                            swal(
+                                'Updated!',
+                                'Your records has been updated.',
+                                'success'
+                            )
+                        }
+                        else
+                            this.messageService.add({ severity: 'error', summary: 'Error  Message', detail: 'Order update failed' });
+                    }
+                });
+        }
     }
 
     updateOrderService(CODICE_ORDINE, PRIORITA_ORDINE) {
@@ -173,4 +193,40 @@ export class Dashboard1Component {
         }).pipe(map((response: any) => response.json()));
     }
 
+    onRowReorder(event, row) {
+        for (let i = 0; i < this.cars.length; i++) {
+            if (this.cars[i]['priorita_ordine'] != 999)
+                this.cars[i]['priorita_ordine'] = i + 1;
+        }
+        if (event.dragIndex != event.dropIndex) {
+            if (event.dragIndex <= event.dropIndex) {
+                this.cars[event.dropIndex - 1]['priorita_ordine'] = event.dropIndex;
+                //this.cars[event.dragIndex]['priorita_ordine'] = event.dragIndex + 1;
+            } else {
+                this.cars[event.dropIndex]['priorita_ordine'] = event.dropIndex + 1;
+                //this.cars[event.dragIndex]['priorita_ordine'] = event.dragIndex + 1;
+            }
+        }
+        if (this.lastL != 0) {
+            this.lastLine(this.lastL - 1);
+        }
+    }
+
+    lastLine(index) {
+        this.lastL = index + 1;
+        for (let i = 0; i < this.cars.length; i++) {
+            if (i > index) {
+                this.cars[i]['priorita_ordine'] = 999;
+                this.cars[i]['edit'] = false;
+            } else {
+                this.cars[i]['priorita_ordine'] = i + 1;
+                this.cars[i]['edit'] = true;
+            }
+            if (i == index) {
+                this.cars[i]['lastLine'] = 'true';
+            } else {
+                this.cars[i]['lastLine'] = 'false';
+            }
+        }
+    }
 }
